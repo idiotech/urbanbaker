@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Runs ghostspeak-agent on the host, on port 8080, against the MySQL and Redis of bin/compose.
+# With arguments, runs those sbt commands instead, e.g. bin/agent test.
+set -euo pipefail
+. "$(dirname "$0")/env.sh"
+cd "$GHOSTSPEAK_HOME/ghostspeak-agent"
+export MYSQL_HOST=127.0.0.1 MYSQL_PORT=3306 MYSQL_JOURNAL_DB=ghostspeak MYSQL_DATABASE=ghostspeak-log
+export MYSQL_USER=ghostspeak MYSQL_PASSWORD=ghostspeak WIDEN_PAYLOAD_COLUMNS=true
+export REDIS_HOST=127.0.0.1 REDIS_PORT=6379
+export CORS_DOMAINS=http://localhost:8000,http://localhost:4444
+export FCM_KEY_FILE
+warn_without_fcm_key
+if [ $# -gt 0 ]; then
+  run_sbt "$@"
+else
+  # staged and run directly: under sbt run, the server would stop when its main returns
+  run_sbt example/stage
+  exec example/target/universal/stage/bin/example
+fi

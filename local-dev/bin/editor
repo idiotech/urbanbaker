@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Runs ghostspeak-editor's dev server on the host, on port 4444; open it at http://localhost:8000.
+set -euo pipefail
+. "$(dirname "$0")/env.sh"
+cd "$GHOSTSPEAK_HOME/ghostspeak-editor"
+if [ ! -f src/FIREBASE_CONFIG.js ]; then
+  echo "missing $PWD/src/FIREBASE_CONFIG.js: see the README" >&2
+  exit 1
+fi
+[ -d node_modules ] || npm ci
+exec npm start
