@@ -25,8 +25,8 @@ The checkouts of `ghostspeak-agent`, `ghostspeak-auth` and `ghostspeak-editor` a
   `sudo systemctl enable --now docker`, `sudo usermod -aG docker $USER`, then log in again).
 - For running services on the host:
   - sbt, or IntelliJ with the Scala plugin, whose sbt launcher the scripts use;
-  - a JDK 17 to 23: sbt 1.9, which the agent uses, does not run on newer ones. The scripts take the
-    first one in `~/.jdks` (IntelliJ downloads JDKs there), or `SBT_JAVA_HOME`;
+  - a JDK 17 or newer (tested with 23 and 26): `SBT_JAVA_HOME`, else `JAVA_HOME`, else the `java`
+    on the PATH, else one IntelliJ downloaded to `~/.jdks`;
   - Node 22 for the editor.
 
 ## First time
@@ -41,8 +41,10 @@ The checkouts of `ghostspeak-agent`, `ghostspeak-auth` and `ghostspeak-editor` a
    };
    ```
    The values are in the Firebase console, under Project settings → Your apps → the web app.
-3. Optional: the agent's FCM service-account JSON at `secrets/fcm.json` (gitignored), or another
-   path in `FCM_KEY_FILE`. Without it the agent runs, but cannot send push messages.
+3. The agent's FCM service-account JSON at `secrets/fcm.json` (gitignored), or another path in
+   `FCM_KEY_FILE`, in a folder of its own: under the `full` profile the container gets the whole
+   folder. Without it the agent runs until it first sends a push message, as when a story starts
+   on a phone, and then stops; the editor works without it.
 
 ## Running
 
@@ -50,8 +52,8 @@ Infrastructure first, then each service in its own terminal:
 
 ```sh
 bin/compose up -d    # MySQL, Redis, router
-bin/agent            # sbt example/run; bin/agent <sbt commands> runs those instead
-bin/auth             # sbt run
+bin/agent            # builds with sbt, then runs; bin/agent <sbt commands> runs those instead
+bin/auth             # the same, e.g. bin/auth test
 bin/editor           # npm start
 ```
 
@@ -73,6 +75,9 @@ bin/compose --profile full up --build
 ## Day to day
 
 - Each service can run on the host or in Docker, not both: they share ports.
+- After installing Docker, log in again for the `docker` group to apply, or run `newgrp docker`.
+- On SELinux systems (openSUSE, Fedora), Compose relabels what it mounts (`:z`), including the
+  editor checkout under the `full` profile, so containers may read it.
 - Running from IntelliJ instead of `bin/agent` or `bin/auth`: copy the environment variables the
   script exports into the run configuration.
 - `bin/compose down` stops everything; `bin/compose down -v` also deletes the MySQL data and the
@@ -80,14 +85,32 @@ bin/compose --profile full up --build
 - MySQL: `bin/compose exec mysql mysql -ughostspeak -pghostspeak ghostspeak`. Databases:
   `ghostspeak` (the agent's journal), `ghostspeak-log` (its performance log), `ghostspeak_auth`.
 
+## The Android app
+
+A debug build of `ghostspeak-client` talks to the server named by `ghostspeak_api_url`, set in its
+`local.properties` or as a Gradle property (`-Pghostspeak_api_url=…`); without it, and in release
+builds, it talks to production. Debug builds allow plain HTTP to the addresses below.
+
+- **Emulator:** `ghostspeak_api_url=http://10.0.2.2:8000/`, the emulator's address for this machine.
+- **Phone on USB:** `ghostspeak_api_url=http://localhost:8000/`, then, each time the phone is
+  connected, `adb reverse tcp:8000 tcp:8000`.
+
+The router listens on 127.0.0.1 only, so a phone on Wi-Fi cannot reach it; opening it to the
+network would open the agent and the superuser endpoint to everyone on it.
+
+The app sends its events over HTTP, but the agent answers with push messages: without
+`secrets/fcm.json`, for the Firebase project the app is built with, the agent stops as a story
+starts. The local agent starts with no stories or categories: publish them from the local
+editor. Uploads, sounds and images still come from the production hosts.
+
 ## Things to know
 
 - **The editor uses the production Firebase project.** Signing in, and every story, category and
   image the editor saves to Firestore or Storage, is real production data. Only what the editor
   sends to the agent (published scenarios, broadcasts) stays local.
-- **Push messages are real.** With a production FCM key, the local agent sends real pushes. The
-  Android app talks to `https://api.urbanbaker.tw/`, fixed when it is built, so phones do not reach
-  the local agent unless built against it.
+- **Push messages are real.** With a production FCM key, the local agent sends real pushes, to the
+  devices that send it events. The Android app talks to `https://api.urbanbaker.tw/` unless a
+  debug build is pointed here; see below.
 - **The superuser endpoint is unauthenticated**, as in production: anyone who can reach it can ask
   whether a uid is a superuser.
 - Production hosts still in the editor: the Google Maps key in `index.html`, and images from

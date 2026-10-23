@@ -8,15 +8,24 @@ if [ -f "$LOCAL_DEV/.env" ]; then
 fi
 GHOSTSPEAK_HOME="${GHOSTSPEAK_HOME:-$(cd "$LOCAL_DEV/../.." && pwd)}"
 FCM_KEY_FILE="$(cd "$LOCAL_DEV" && realpath -m "${FCM_KEY_FILE:-./secrets/fcm.json}")"
+# the container gets the key's folder: a missing file mounted alone would come out a directory
+FCM_KEY_DIR="$(dirname "$FCM_KEY_FILE")"
+FCM_KEY_NAME="$(basename "$FCM_KEY_FILE")"
+
+# the agent reads the key at its first push, and a missing key stops it
+warn_without_fcm_key() {
+  [ -f "$FCM_KEY_FILE" ] ||
+    echo "warning: no $FCM_KEY_FILE: the agent will stop when it first sends a push message" >&2
+}
 
 # sbt from the PATH, else the launcher IntelliJ's Scala plugin ships
 run_sbt() {
   local java_home="${SBT_JAVA_HOME:-${JAVA_HOME:-}}"
-  if [ -z "$java_home" ]; then
-    # sbt 1.9 does not run on the newest JDKs: take the first 17 to 23 found
-    java_home="$(ls -d "$HOME"/.jdks/*-{17,18,19,20,21,22,23}* 2>/dev/null | head -1)"
+  if [ -z "$java_home" ] && ! command -v java >/dev/null; then
+    # no JDK set up: take one IntelliJ downloaded
+    java_home="$(ls -d "$HOME"/.jdks/*/ 2>/dev/null | tail -1)"
   fi
-  [ -n "$java_home" ] && export JAVA_HOME="$java_home"
+  [ -n "$java_home" ] && export JAVA_HOME="${java_home%/}"
   if command -v sbt >/dev/null; then
     sbt "$@"
   else

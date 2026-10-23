@@ -3,5 +3,8 @@
 set -euo pipefail
 . "$(dirname "$0")/env.sh"
 cd "$LOCAL_DEV"
-export GHOSTSPEAK_HOME FCM_KEY_FILE
+export GHOSTSPEAK_HOME FCM_KEY_DIR FCM_KEY_NAME
+if [[ " $* " == *" up "* && " $* " == *" full "* ]]; then
+  warn_without_fcm_key
+fi
 exec docker compose "$@"

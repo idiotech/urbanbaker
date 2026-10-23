@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 # Runs ghostspeak-auth on the host, on port 8082, against the MySQL of bin/compose.
+# With arguments, runs those sbt commands instead, e.g. bin/auth test.
 set -euo pipefail
 . "$(dirname "$0")/env.sh"
 cd "$GHOSTSPEAK_HOME/ghostspeak-auth"
 export MYSQL_HOST=127.0.0.1 MYSQL_USER=ghostspeak MYSQL_PASSWORD=ghostspeak
 export CORS_DOMAINS=http://localhost:8000,http://localhost:4444
-run_sbt "${@:-run}"
+if [ $# -gt 0 ]; then
+  run_sbt "$@"
+else
+  # staged and run directly, on the JVM's main thread as cats-effect expects
+  run_sbt stage
+  exec target/universal/stage/bin/ghostspeak-auth
+fi

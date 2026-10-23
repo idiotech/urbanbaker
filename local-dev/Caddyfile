@@ -1,17 +1,30 @@
 # One address for the editor and everything it calls, as in production, so the editor needs no
 # changes: it loads /appConfigs.js, which points it back here.
+(upstreams) {
+	# each service is a container or runs on the host; use whichever answers
+	lb_policy first
+	lb_try_duration 2s
+	fail_duration 5s
+}
+
 :8000 {
 	handle /appConfigs.js {
 		header Content-Type "text/javascript; charset=utf-8"
 		respond `window.appConfigs = { api_url: "http://localhost:8000" };`
 	}
 	handle /v1/user/* {
-		reverse_proxy {$AUTH_UPSTREAM}
+		reverse_proxy {$AUTH_UPSTREAM} {
+			import upstreams
+		}
 	}
 	handle /v1/* {
-		reverse_proxy {$AGENT_UPSTREAM}
+		reverse_proxy {$AGENT_UPSTREAM} {
+			import upstreams
+		}
 	}
 	handle {
-		reverse_proxy {$EDITOR_UPSTREAM}
+		reverse_proxy {$EDITOR_UPSTREAM} {
+			import upstreams
+		}
 	}
 }
