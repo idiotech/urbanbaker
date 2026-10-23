@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Runs ghostspeak-agent on the host, on port 8080, against the MySQL and Redis of bin/compose.
+set -euo pipefail
+. "$(dirname "$0")/env.sh"
+cd "$GHOSTSPEAK_HOME/ghostspeak-agent"
+export MYSQL_HOST=127.0.0.1 MYSQL_PORT=3306 MYSQL_JOURNAL_DB=ghostspeak MYSQL_DATABASE=ghostspeak-log
+export MYSQL_USER=ghostspeak MYSQL_PASSWORD=ghostspeak WIDEN_PAYLOAD_COLUMNS=true
+export REDIS_HOST=127.0.0.1 REDIS_PORT=6379
+export CORS_DOMAINS=http://localhost:8000,http://localhost:4444
+export FCM_KEY_FILE
+[ -f "$FCM_KEY_FILE" ] || echo "warning: no $FCM_KEY_FILE: push messages will fail" >&2
+run_sbt "${@:-example/run}"

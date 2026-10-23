@@ -1,0 +1,17 @@
+# One address for the editor and everything it calls, as in production, so the editor needs no
+# changes: it loads /appConfigs.js, which points it back here.
+:8000 {
+	handle /appConfigs.js {
+		header Content-Type "text/javascript; charset=utf-8"
+		respond `window.appConfigs = { api_url: "http://localhost:8000" };`
+	}
+	handle /v1/user/* {
+		reverse_proxy {$AUTH_UPSTREAM}
+	}
+	handle /v1/* {
+		reverse_proxy {$AGENT_UPSTREAM}
+	}
+	handle {
+		reverse_proxy {$EDITOR_UPSTREAM}
+	}
+}

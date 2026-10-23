@@ -1,0 +1,92 @@
+# MySQL, Redis and the router always run. The services run on the host (bin/agent, bin/auth,
+# bin/editor), or here with the "full" profile; the router reaches them on the host's ports either way.
+name: ghostspeak
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: ghostspeak
+      MYSQL_PASSWORD: ghostspeak
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      retries: 30
+
+  redis:
+    image: redis:8.8-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  router:
+    image: caddy:2.11-alpine
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      AGENT_UPSTREAM: host.docker.internal:8080
+      AUTH_UPSTREAM: host.docker.internal:8082
+      EDITOR_UPSTREAM: host.docker.internal:4444
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+
+  agent:
+    profiles: [full]
+    build:
+      context: ${GHOSTSPEAK_HOME:-../..}/ghostspeak-agent
+      dockerfile: ${PWD}/docker/agent.Dockerfile
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_JOURNAL_DB: ghostspeak
+      MYSQL_USER: ghostspeak
+      MYSQL_PASSWORD: ghostspeak
+      WIDEN_PAYLOAD_COLUMNS: "true"
+      REDIS_HOST: redis
+      CORS_DOMAINS: http://localhost:8000,http://localhost:4444
+      FCM_KEY_FILE: /secrets/fcm.json
+    volumes:
+      - ${FCM_KEY_FILE:-./secrets/fcm.json}:/secrets/fcm.json:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_started }
+
+  auth:
+    profiles: [full]
+    build:
+      context: ${GHOSTSPEAK_HOME:-../..}/ghostspeak-auth
+      dockerfile: ${PWD}/docker/auth.Dockerfile
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_USER: ghostspeak
+      MYSQL_PASSWORD: ghostspeak
+      CORS_DOMAINS: http://localhost:8000,http://localhost:4444
+    ports:
+      - "127.0.0.1:8082:8082"
+    depends_on:
+      mysql: { condition: service_healthy }
+
+  editor:
+    profiles: [full]
+    image: node:22-bookworm-slim
+    working_dir: /app
+    command: sh -c "npm ci && npm start"
+    volumes:
+      - ${GHOSTSPEAK_HOME:-../..}/ghostspeak-editor:/app
+      # kept apart from the checkout's own node_modules, which the host's npm may have built
+      - editor-node-modules:/app/node_modules
+    ports:
+      - "127.0.0.1:4444:4444"
+
+volumes:
+  mysql:
+  editor-node-modules:

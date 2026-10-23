@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Runs ghostspeak-auth on the host, on port 8082, against the MySQL of bin/compose.
+set -euo pipefail
+. "$(dirname "$0")/env.sh"
+cd "$GHOSTSPEAK_HOME/ghostspeak-auth"
+export MYSQL_HOST=127.0.0.1 MYSQL_USER=ghostspeak MYSQL_PASSWORD=ghostspeak
+export CORS_DOMAINS=http://localhost:8000,http://localhost:4444
+run_sbt "${@:-run}"

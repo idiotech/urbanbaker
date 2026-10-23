@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Makes a Firebase uid a superuser in the local auth database: it then sees every story in the editor.
+set -euo pipefail
+if [ $# -ne 1 ]; then
+  echo "usage: $0 <firebase uid>" >&2
+  exit 2
+fi
+case "$1" in
+  *[!A-Za-z0-9_-]*) echo "not a Firebase uid: $1" >&2; exit 2 ;;
+esac
+"$(dirname "$0")/compose" exec -T mysql mysql -ughostspeak -pghostspeak ghostspeak_auth -e \
+  "CREATE TABLE IF NOT EXISTS superuser (uid VARCHAR(128) NOT NULL PRIMARY KEY, note VARCHAR(255) NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);
+   INSERT IGNORE INTO superuser (uid) VALUES ('$1');"
+echo "$1 is a superuser"

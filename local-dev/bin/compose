@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# docker compose, from this directory whatever the caller's: compose.yaml finds its files from here.
+set -euo pipefail
+. "$(dirname "$0")/env.sh"
+cd "$LOCAL_DEV"
+export GHOSTSPEAK_HOME FCM_KEY_FILE
+exec docker compose "$@"
