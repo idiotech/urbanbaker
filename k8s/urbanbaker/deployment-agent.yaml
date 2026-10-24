@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: agent
+  name: agent
+  namespace: urbanbaker
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: agent
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        autopilot.gke.io/selector-toleration: '{"inputTolerations":[{"key":"kubernetes.io/arch","operator":"Equal","value":"amd64","effect":"NoSchedule"}],"outputTolerations":[{"key":"kubernetes.io/arch","operator":"Equal","value":"amd64","effect":"NoSchedule"},{"key":"cloud.google.com/gke-spot","operator":"Equal","value":"true","effect":"NoSchedule"}],"modified":true}'
+      labels:
+        app: agent
+    spec:
+      containers:
+      - env:
+        - name: LOG_LEVEL
+          value: INFO
+        - name: FCM_KEY_FILE
+          value: /etc/fcm-key/fcm-key.json
+        - name: ENGINE
+          value: graphscript
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              key: redis_host
+              name: agent-config
+        - name: MYSQL_HOST
+          valueFrom:
+            configMapKeyRef:
+              key: mysql_host
+              name: agent-config
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              key: mysql_username
+              name: agent-secret
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: mysql_root_password
+              name: agent-secret
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: mysql_password
+              name: agent-secret
+        - name: MYSQL_JOURNAL_DB
+          valueFrom:
+            configMapKeyRef:
+              key: mysql_journal_db
+              name: agent-config
+        - name: MYSQL_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              key: mysql_database
+              name: agent-config
+        - name: CORS_DOMAINS
+          valueFrom:
+            configMapKeyRef:
+              key: cors_domains
+              name: agent-config
+        image: docker.urbanbaker.tw/urbanbaker/ghostspeak-agent:23998a4
+        imagePullPolicy: Always
+        name: agent
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /v1/scenario/graphscript/test
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: "1"
+            ephemeral-storage: 100Mi
+            memory: 1Gi
+          requests:
+            cpu: 50m
+            ephemeral-storage: 100Mi
+            memory: 256Mi
+        securityContext:
+          capabilities:
+            drop:
+            - NET_RAW
+        startupProbe:
+          failureThreshold: 30
+          httpGet:
+            path: /v1/scenario/graphscript/test
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/fcm-key
+          name: fcm-key
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+      - name: regcred
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 25
+      tolerations:
+      - effect: NoSchedule
+        key: kubernetes.io/arch
+        operator: Equal
+        value: amd64
+      - effect: NoSchedule
+        key: cloud.google.com/gke-spot
+        operator: Equal
+        value: "true"
+      volumes:
+      - name: fcm-key
+        secret:
+          defaultMode: 420
+          secretName: fcm-key
