@@ -72,7 +72,7 @@ spec:
             configMapKeyRef:
               key: cors_domains
               name: agent-config
-        image: docker.urbanbaker.tw/urbanbaker/ghostspeak-agent:23998a4
+        image: docker.urbanbaker.tw/urbanbaker/ghostspeak-agent:a8e6a44
         imagePullPolicy: Always
         name: agent
         ports:
