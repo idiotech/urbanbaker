@@ -72,6 +72,12 @@ spec:
             configMapKeyRef:
               key: cors_domains
               name: agent-config
+        - name: STAFF_CODE
+          valueFrom:
+            secretKeyRef:
+              key: staff_code
+              name: agent-secret
+              optional: true
         image: docker.urbanbaker.tw/urbanbaker/ghostspeak-agent:a8e6a44
         imagePullPolicy: Always
         name: agent
